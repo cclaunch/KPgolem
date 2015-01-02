@@ -23,11 +23,6 @@ void doPunch() {
   curCol = 1;
   gotRelease = false;
   
-// CVC  while (digitalRead(REG) == LOW) {
-// CVC    Serial1.println(F("Register a card at the punch station"));
-// CVC    delay(1000);
-// CVC  }
-  
   // If we are in verify mode and we had punched the prior card, preload read value with dummy cycle  
   if ((cmdVerify == true) && lastLength > 0) {
      getFirstCol();                                   // will be in variable readIn
@@ -93,12 +88,6 @@ void doPunch() {
       if (lastCard[i] != readIn) {
         Serial1.print(F("WARN Verify error column "));
         Serial1.println(curCol-1);
-        Serial1.print("lastcard value for column "); // CVC
-        Serial1.print(i); // CVC
-        Serial1.print("was "); // CVC
-        Serial1.print(lastCard[i], HEX); // CVC
-        Serial1.print(" but what we read was "); // CVC
-        Serial1.println(readIn, HEX); // CVC
       }
     }
  }                                                                // end loop through columns to punch and verify
