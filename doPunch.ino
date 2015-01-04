@@ -23,7 +23,12 @@ void doPunch() {
   curCol = 1;
   gotRelease = false;
   
-  // If we are in verify mode and we had punched the prior card, preload read value with dummy cycle  
+  while (digitalRead(REG) == LOW) {
+    Serial1.println(F("Register a card at the punch station"));
+    delay(1000);
+  }
+  
+// If we are in verify mode and we had punched the prior card, preload read value with dummy cycle  
   if ((cmdVerify == true) && lastLength > 0) {
      getFirstCol();                                   // will be in variable readIn
   }
