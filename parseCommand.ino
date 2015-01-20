@@ -20,6 +20,11 @@
 //                            0 - basic test of connectivity
 //                            1 - basic plus punch a card to test all operations
 //                              (note test 1 requires reader cable to verify results)
+//    IDLE            - does nothing, but allows immediate execution of the preceeding
+//                           command which otherwise must wait until we have seen
+//                           a delimiter (e.g. _) and another non-delimiter character
+//                           otherwise we might be seeing the first delim of an escape
+//                           sequence where the character is not meant as a message delimiter
 //
 //      if FULLVERBS is set to 0, only the first letter is required for each verb
 //
@@ -394,6 +399,17 @@ int  parseCommand() {
           }
       } else {
         Serial1.println(F("Malformed LOAD command"));
+        cmdLine[0] = ' ';                                // make verb invalid (blank)
+      }
+      break;
+      
+    case 'I':
+      if ((FULLVERBS == 0) && (cmdLength >= 1)) {
+        cmdLine[0] = 'I';       
+      } else if ((FULLVERBS == 1) && (memcmp_P(cmdLine, CIDLE, 4) == 0)) {
+        cmdLine[0] = 'I';
+      } else {
+        Serial1.println(F("Malformed IDLE command"));
         cmdLine[0] = ' ';                                // make verb invalid (blank)
       }
       break;

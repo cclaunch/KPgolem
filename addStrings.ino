@@ -14,3 +14,4 @@ unsigned char CON[]       PROGMEM = "ON";
 unsigned char COFF[]      PROGMEM = "OFF";
 unsigned char CBCD[]      PROGMEM = "BCD";
 unsigned char CEBCDIC[]   PROGMEM = "EBCDIC";
+unsigned char CIDLE[]     PROGMEM = "IDLE";

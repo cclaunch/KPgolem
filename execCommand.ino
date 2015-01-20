@@ -21,6 +21,9 @@ void  execCommand() {
         Serial1.println(F("OFF"));
       }
       
+  } else if (cmdLine[0] == 'I') {
+      Serial1.print(F("Idle received"));
+      
   } else if (cmdLine[0] == 'M') {
       // verification state already set, so just exit with confirmation message
       switch (cmdMode) {

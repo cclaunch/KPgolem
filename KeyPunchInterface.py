@@ -10,13 +10,16 @@ def kpinit(mylink, myport):
     mylink.parity = serial.PARITY_NONE
     mylink.stopbits = serial.STOPBITS_ONE
     mylink.bytesize = serial.EIGHTBITS
-    mylink.xonxoff = False
+    mylink.xonxoff = True
     mylink.port = myport
     mylink.timeout = 0
     mylink.writeTimeout = 2
     mylink.open()
     if (mylink.isOpen() == False):
+        KPapp.connected = True
         KPapp.errstatus = "our port did not open, aborting"
+        KPapp.myconfig.DeleteEntry("Serial/Port")
+        KPapp.myconfig.Flush()
         noKeypunch()
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
@@ -134,6 +137,16 @@ def goto(self):
     mydlg.Destroy()
     return
 
+# forget the saved serial port
+def dropport(self):
+    KPapp.myconfig.DeleteEntry("Serial/Port")
+    KPapp.myconfig.Flush()
+    KPapp.errstatus = "Serial port forgotten, restart to select new one"
+    KPapp.statpane.Refresh()
+    KPapp.statpane.Update()
+    noKeypunch()
+    return
+
 # routine to set encoding to BCD as ASCII characters
 def setbcd(self):
     KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n"
@@ -143,6 +156,20 @@ def setbcd(self):
     KPapp.statcode = 'BCD'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "MODE ASCII")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is ASCII')
+        if (temppos != -1):
+            break
+    KPsend(self, "CODE BCD")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is BCD')
+        if (temppos != -1):
+            break
     return
 
 # routine to set encoding to EBCDIC as ASCII characters
@@ -154,6 +181,20 @@ def setebcdic(self):
     KPapp.statcode = 'EBCDIC'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "MODE ASCII")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is ASCII')
+        if (temppos != -1):
+            break
+    KPsend(self, "CODE EBCDIC")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is EBCDIC')
+        if (temppos != -1):
+            break
     return
 
 # routine to set encoding to keypunch binary mode as sets of four ASCII hex digits
@@ -165,6 +206,14 @@ def setbinary(self):
     KPapp.statcode = 'binary'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "MODE BINARY")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is BINARY')
+        if (temppos != -1):
+            break
     return
 
 # routine to set encoding to 1130 simulator card files
@@ -219,9 +268,9 @@ def KPconnect(self):
 
     # set up a timer we can use to handle timeout if the box isn't there or the cable or link is down
     # if the timer pops, we set errstatus message and disable all menu entries except quit in a 
-    # seperate handler routine, while this one stalls. Gives us 4 seconds for it to initialize
+    # seperate handler routine, while this one stalls. Gives us 10 seconds for it to initialize
     self.conntimer = mytimer(id = 99)
-    self.conntimer.Start(milliseconds = 4000, oneShot = True)
+    self.conntimer.Start(milliseconds = 10000, oneShot = True)
 
     # first look for healthy keypunch interface box
     KPsend(self, "_IDLE", sendidle=False)                   # first idle just to terminate any junk of partial command in interface buffer
@@ -243,6 +292,9 @@ def KPconnect(self):
         elif (KPapp.KPmessage.find("Diag 0 completed") != -1):
             break
 
+    # stop the timer since we completed the Diag 0 routine successfully
+    self.conntimer.Stop()
+
     # now setup the box for the encoding desired by the user
     # which sends the MODE command and usually the CODE command
     encodemsg = "_CODE "
@@ -263,11 +315,10 @@ def KPconnect(self):
         return
 
     # send the mode message first and get response
-    KPsend(self, modemsg)                               # ask for desired mode (ASCII or BINARY)
+    KPsend(self, modemsg)                                   # ask for desired mode (ASCII or BINARY)
     while (True):
-        if (self.conntimer.IsRunning() == False):             # did we see timer pop?
-            return                                          # get out of this routine entirely
         getKPresponse(self)                                 # wait for response then check it
+        print ("msg",KPapp.KPmessage)           # CVC temp
         if (KPapp.KPmessage.find("OK Mode is ") != -1):
             break
 
@@ -296,10 +347,10 @@ def KPconnect(self):
 
         # now scan for response
         while (True):
-            if (self.conntimer.IsRunning() == False):             # did we see timer pop?
-                return                                          # get out of this routine entirely
             getKPresponse(self)                             # block until we get response
-            temppos = KPapp.KPmesssage.find("OK ASCII input to encode ")
+            print ("msg",KPapp.KPmessage)           # CVC temp
+
+            temppos = KPapp.KPmessage.find("OK ASCII input to encode ")
             if (temppos != -1):
                 break
     
@@ -308,7 +359,7 @@ def KPconnect(self):
             temppos = re.search('(?<=^OK ASCII input to encode ).+$', KPapp.KPmessage).group(0)
         except:
             temppos = ""
-        if ((temppos.find("BCD") != -1) and (KPapp.statcode != "BCD")):
+        if ((temppos.find("BCD ") != -1) and (KPapp.statcode != "BCD")):
             KPapp.errstatus = "Did not switch to BCD mode"
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
@@ -318,12 +369,15 @@ def KPconnect(self):
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
             return
-    return
+    
+        # bye bye, we have connected
+        KPapp.goodlink = True
+        return
 
 # this function will punch a card from the file
 def KPpunch(self):
     tempcmd = "_P"
-    tempcmd += KPapp.flines[KPapp.myfilecurrent]
+    tempcmd += KPapp.flines[KPapp.myfilecurrent-1]
 
     KPapp.myfilecurrent += 1
     KPapp.myfilecurrentstr = str(KPapp.myfilecurrent)
@@ -385,10 +439,12 @@ def getKPresponse(self):
         endpos = KPapp.KPbuffer.find('\n')
         if (endpos != -1):
             KPapp.fullmessage = True
-    KPapp.KPmessage = KPapp.KPbuffer[:endpos]           # copy message dropping the final NL
-    if ((endpos+1) > len(KPapp.KPbuffer)):              # more data after the NL?
+    KPapp.KPmessage = KPapp.KPbuffer[:endpos-1]         # copy message dropping the final NL and preceeding character
+    if (KPapp.KPbuffer[endpos-1] != '\r'):
+        KPapp.KPmessage += KPapp.KPbuffer[endpos-1]
+    if (len(KPapp.KPbuffer) > (endpos + 1)):            # more data after the NL?
         KPapp.KPbuffer = KPapp.KPbuffer[endpos+1:]      # get the remainder
-        KPapp.KPlen -= endpos                           # drop the length down as well
+        KPapp.KPlen -= (endpos+1)                       # drop the length down as well
     else:
         KPapp.KPbuffer = ""                             # set up as empty buffer
         KPapp.KPlen = 0                                 # and mark the length as zero
@@ -415,7 +471,7 @@ def KPsend(self, thecommand, sendidle=True):
 
     try:
         KPapp.mylink.write(thecommand)
-    except SerialTimeoutException:
+    except serial.serialutil.SerialTimeoutException:
         KPapp.errstatus = "Timeout sending to keypunch - aborting"
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
@@ -433,13 +489,10 @@ def noReadCable(self):
 
 # routine to disable all menus except encoding and quit
 def noKeypunch(self):
-     KPapp.menufile.Enable(1, False)
      KPapp.menufile.Enable(2, False)
-     KPapp.menufile.Enable(4, False)
      KPapp.menuactions.Enable(20, False)
      KPapp.menuactions.Enable(21, False)
      KPapp.menuactions.Enable(22, False)
-     KPapp.menuactions.Enable(23, False)
      KPapp.menuactions.Enable(24, False)
      return
 
@@ -615,6 +668,8 @@ class MyFrame(wx.Frame):
         men1130card = myoptionsmenu.Append(33, '1130card\tCtrl + 4', '1130 hollerith encoded in ASCII', kind=wx.ITEM_RADIO)
         men1130binary = myoptionsmenu.Append(34, '1130binary\tCtrl + 5', '1130 binary cards encoded ASCII', kind=wx.ITEM_RADIO)
         myline4 = myoptionsmenu.AppendSeparator()
+        myreset = myoptionsmenu.Append(50, 'F&orget serial port\tCtrl + F', 'Forget the saved serial port')
+        myline5 = myoptionsmenu.AppendSeparator()
         myabout = myoptionsmenu.Append(40, 'About . . .', 'About this program')
         mybar.Append(myfilemenu, "File")
         mybar.Append(myactionmenu, "Actions")
@@ -636,6 +691,7 @@ class MyFrame(wx.Frame):
                                                     (wx.ACCEL_CTRL, ord('3'), 32),
                                                     (wx.ACCEL_CTRL, ord('4'), 33),
                                                     (wx.ACCEL_CTRL, ord('5'), 34),
+                                                    (wx.ACCEL_CTRL, ord('F'), 50),
                                                     ])
         self.SetAcceleratorTable(self.myacceltab)
         KPapp.menoptions = myoptionsmenu
@@ -658,6 +714,7 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, set1130card, men1130card)
         self.Bind(wx.EVT_MENU, set1130binary, men1130binary)
         self.Bind(wx.EVT_MENU, self.showabout, myabout)
+        self.Bind(wx.EVT_MENU, dropport, myreset)
 
         # finish our startup
         self.punchfilename = ""
@@ -684,12 +741,23 @@ class MyFrame(wx.Frame):
             return
 
         if (KPapp.gopunch == True):
+
             # drive punching a card, using current card position
             KPpunch(self)               # ask our routine to do the interaction
+
+            # now if we have punched the last card, lets pause and put up a "Done" message
+            if (KPapp.myfilecurrent > KPapp.myfilelen):
+                KPapp.pause = True
+                KPapp.errstatus = "Done punching file"
+                KPapp.statpane.Refresh()
+                KPapp.statpane.Update()
+
         elif (KPapp.goread == True):
+
             # drive reading a card into the fline array and on screen
             KPreadCard(self)                                                    # get from KP and put into last flines
             self.fileobject.write(KPapp.flines[KPapp.myfilecurrent] + '\n')     # write it out to the file
+
         return
 
     def OnQuit(self, event):
@@ -855,11 +923,11 @@ class MyFrame(wx.Frame):
         self.readfilename = ""
         self.punchfilename = ""
         KPapp.statfile = "CLOSED"
-        KPapp.myview.SetRowColumnCount(0,0)
+        self.myview.SetRowColumnCount(0,0)
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
-        KPapp.myview.Refresh()
-        KPapp.myview.Update()
+        self.myview.Refresh()
+        self.myview.Update()
         return
 
     def onSize(self, event):
@@ -922,7 +990,10 @@ class MyFrame(wx.Frame):
         else:
             thisport = 'FUBAR'
         if (thisport == 'FUBAR'):
+            KPapp.connected = True
             KPapp.errstatus = "Invalid port in config file, restart"
+            KPapp.myconfig.DeleteEntry("Serial/Port")
+            KPapp.myconfig.Flush()
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
             return
@@ -987,6 +1058,7 @@ class KPapp (wx.App):
     pause = False
     fullmessage = False
     connected = False
+    goodlink = False
 
 
     # this is called by the GUI library when we start it up and lets us put up our main window
