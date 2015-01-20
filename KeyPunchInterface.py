@@ -5,6 +5,11 @@ import wx
 import re
 import os
 
+#
+# KeyPunchInterface program to drive the KPgolem interface box in an IBM keypunch (e.g. 029)
+#         see https://github.com/cclaunch/KPgolem for details and other materials
+#
+
 def kpinit(mylink, myport):
     mylink.baudrate = 9600
     mylink.parity = serial.PARITY_NONE
@@ -45,6 +50,7 @@ def startpunch(self):
         KPapp.pause = False
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Starting or restarting punching of cards at card " + KPapp.myfilecurrentstr + "\n")
     return
 
 # routine to pause the keypunch when it is punching or reading a deck
@@ -56,6 +62,7 @@ def pausepunch(self):
         KPapp.pause = True
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Pausing keypunch at card " + KPapp.myfilecurrentstr + "\n")
     return
 
 # routine to start reading cards from the keypunch
@@ -70,6 +77,7 @@ def startread(self):
         KPapp.pause = False
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Starting or restarting read of cards from keypunch into file, at card " + KPapp.myfilecurrentstr + "\n")
     return
 
 # routine to stop the keypunch when it has read the last card
@@ -82,6 +90,7 @@ def stoppunch(self):
         KP.pause = False
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Ending the reading of cards from keypunch into file, length of deck is now " + KPapp.myfilelenstr + "\n")
     return
 
 # routine to reposition a paused keypunch to a user selected card number
@@ -111,6 +120,7 @@ def goto(self):
     # validate this as a decimal number between 1 and file length
     if (re.search("^ *[0-9]+ *$",myans) == None):    # get None if not a dec number
         KPapp.errstatus = "Must be a number"
+        wx.LogGeneric(wx.LOG_User, "Goto command but input " + myans + " not a number\n")
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
         mydlg.Destroy()
@@ -118,6 +128,7 @@ def goto(self):
     mycard = int(myans)
     if ((mycard < 1) or (mycard > KPapp.myfilelen)):
         KPapp.errstatus = "Requested card number not within file"
+        wx.LogGeneric(wx.LOG_User, "Goto command but card " + myans + " not in deck\n")
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
         mydlg.Destroy()
@@ -132,6 +143,7 @@ def goto(self):
     KPapp.viewpane.Update()
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Goto command repositioned deck to card " + KPapp.myfilecurrentstr + "\n")
 
     # dump dialog and go away
     mydlg.Destroy()
@@ -142,9 +154,10 @@ def dropport(self):
     KPapp.myconfig.DeleteEntry("Serial/Port")
     KPapp.myconfig.Flush()
     KPapp.errstatus = "Serial port forgotten, restart to select new one"
+    wx.LogGeneric(wx.LOG_User, "User asked to remove serial port from init file, must restart now\n")
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
-    noKeypunch()
+    noKeypunch(self)
     return
 
 # routine to set encoding to BCD as ASCII characters
@@ -158,18 +171,19 @@ def setbcd(self):
     KPapp.statpane.Update()
     if (KPapp.goodlink == False):                   # link not established
         return
-    KPsend(self, "MODE ASCII")
+    KPsend(self, "_MODE ASCII")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find('is ASCII')
         if (temppos != -1):
             break
-    KPsend(self, "CODE BCD")
+    KPsend(self, "_CODE BCD")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find('is BCD')
         if (temppos != -1):
             break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to BCD mode\n")
     return
 
 # routine to set encoding to EBCDIC as ASCII characters
@@ -183,18 +197,19 @@ def setebcdic(self):
     KPapp.statpane.Update()
     if (KPapp.goodlink == False):                   # link not established
         return
-    KPsend(self, "MODE ASCII")
+    KPsend(self, "_MODE ASCII")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find('is ASCII')
         if (temppos != -1):
             break
-    KPsend(self, "CODE EBCDIC")
+    KPsend(self, "_CODE EBCDIC")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find('is EBCDIC')
         if (temppos != -1):
             break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to EBCDIC mode\n")
     return
 
 # routine to set encoding to keypunch binary mode as sets of four ASCII hex digits
@@ -208,12 +223,13 @@ def setbinary(self):
     KPapp.statpane.Update()
     if (KPapp.goodlink == False):                   # link not established
         return
-    KPsend(self, "MODE BINARY")
+    KPsend(self, "_MODE BINARY")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find('is BINARY')
         if (temppos != -1):
             break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to binary mode\n")
     return
 
 # routine to set encoding to 1130 simulator card files
@@ -225,6 +241,7 @@ def set1130card(self):
     KPapp.statcode = '1130 Card'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to 1130 card image mode\n")
     return
 
 # routine to set encoding to 1130 simulator binary files
@@ -236,6 +253,7 @@ def set1130binary(self):
     KPapp.statcode = '1130 binary'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to 1130 binary image mode\n")
     return
 
 def validateline(theline):
@@ -265,6 +283,8 @@ def validateline(theline):
 def KPconnect(self):
     # yield first time we are entered to free up the idle loop
     wx.Yield()
+    wx.LogGeneric(wx.LOG_User, "Initiating link to keypunch interface\n")
+
 
     # set up a timer we can use to handle timeout if the box isn't there or the cable or link is down
     # if the timer pops, we set errstatus message and disable all menu entries except quit in a 
@@ -318,7 +338,6 @@ def KPconnect(self):
     KPsend(self, modemsg)                                   # ask for desired mode (ASCII or BINARY)
     while (True):
         getKPresponse(self)                                 # wait for response then check it
-        print ("msg",KPapp.KPmessage)           # CVC temp
         if (KPapp.KPmessage.find("OK Mode is ") != -1):
             break
 
@@ -348,7 +367,6 @@ def KPconnect(self):
         # now scan for response
         while (True):
             getKPresponse(self)                             # block until we get response
-            print ("msg",KPapp.KPmessage)           # CVC temp
 
             temppos = KPapp.KPmessage.find("OK ASCII input to encode ")
             if (temppos != -1):
@@ -372,6 +390,7 @@ def KPconnect(self):
     
         # bye bye, we have connected
         KPapp.goodlink = True
+        wx.LogGeneric(wx.LOG_User, "Initiated communication with keypunch interface\n")
         return
 
 # this function will punch a card from the file
@@ -405,7 +424,7 @@ def KPpunch(self):
 # this function will read a card from the keypunch and add it to the previously read ones
 # updates flines for viewing and expects the caller to write the line to the file
 def KPreadCard(self):
-    KPsend("R")
+    KPsend(self,"_R")
     while (True):
         getKPresponse(self)
         temppos = KPapp.KPmessage.find("OK Read card:")
@@ -449,6 +468,7 @@ def getKPresponse(self):
         KPapp.KPbuffer = ""                             # set up as empty buffer
         KPapp.KPlen = 0                                 # and mark the length as zero
     KPapp.fullmessage = False
+    wx.LogGeneric(wx.LOG_User, "KP-> " + KPapp.KPmessage + "\n")
     return
 
 # this function will extract all the inbound characters that are 
@@ -485,6 +505,7 @@ def noReadCable(self):
      KPapp.menufile.Enable(2, False)
      KPapp.menuactions.Enable(23, False)
      KPapp.menuactions.Enable(24, False)
+     wx.LogGeneric(wx.LOG_User, "No reader cable configured thus disabling reading actions\n")
      return
 
 # routine to disable all menus except encoding and quit
@@ -494,7 +515,13 @@ def noKeypunch(self):
      KPapp.menuactions.Enable(21, False)
      KPapp.menuactions.Enable(22, False)
      KPapp.menuactions.Enable(24, False)
+     wx.LogGeneric(wx.LOG_User, "Unable to reach keypunch thus disabling all machine actions\n")
      return
+
+# routine to toggle the log on and off
+def toggleLog(self):
+    KPapp.mylog.Show(True)
+    return
 
 class myviewclass (wx.HVScrolledWindow ):
 #    def __init__(self, myparent, myid, mypos=wx.Point(0,0), mysize=wx.Size(0,0), mystyle=0):
@@ -543,6 +570,7 @@ class mytimer(wx.Timer):
     def Notify(self):
         noKeypunch(self)                                # shut off all menu actions since we are dead in the water
         KPapp.errstatus = "Timeout connecting to keypunch, fix and restart this program"
+        wx.LogGeneric(wx.LOG_User,"Timer aborted attempt to reach keypunch interface, check cables\n")
         KPapp.statpane.Refresh()
         KPapp.statpane.Update()
         return
@@ -669,6 +697,7 @@ class MyFrame(wx.Frame):
         men1130binary = myoptionsmenu.Append(34, '1130binary\tCtrl + 5', '1130 binary cards encoded ASCII', kind=wx.ITEM_RADIO)
         myline4 = myoptionsmenu.AppendSeparator()
         myreset = myoptionsmenu.Append(50, 'F&orget serial port\tCtrl + F', 'Forget the saved serial port')
+        mylog = myoptionsmenu.Append(45, 'Show Keypunch L&og\tCtrl + L', 'Displays a log of KP interface outputs')
         myline5 = myoptionsmenu.AppendSeparator()
         myabout = myoptionsmenu.Append(40, 'About . . .', 'About this program')
         mybar.Append(myfilemenu, "File")
@@ -691,6 +720,7 @@ class MyFrame(wx.Frame):
                                                     (wx.ACCEL_CTRL, ord('3'), 32),
                                                     (wx.ACCEL_CTRL, ord('4'), 33),
                                                     (wx.ACCEL_CTRL, ord('5'), 34),
+                                                    (wx.ACCEL_CTRL, ord('L'), 45),
                                                     (wx.ACCEL_CTRL, ord('F'), 50),
                                                     ])
         self.SetAcceleratorTable(self.myacceltab)
@@ -715,6 +745,12 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, set1130binary, men1130binary)
         self.Bind(wx.EVT_MENU, self.showabout, myabout)
         self.Bind(wx.EVT_MENU, dropport, myreset)
+        self.Bind(wx.EVT_MENU, toggleLog, mylog)
+
+        # now create the log window but leave it initially hidden
+        KPapp.mylog = wx.LogWindow(self, "Log of messages from keypunch interface")
+        KPapp.mylog.Show(False)
+        wx.LogGeneric(wx.LOG_User, "Starting KP interface\n")
 
         # finish our startup
         self.punchfilename = ""
@@ -742,6 +778,7 @@ class MyFrame(wx.Frame):
 
         if (KPapp.gopunch == True):
 
+            wx.LogGeneric (wx.LOG_User, "punching card" + str(KPapp.myfilecurrent-1) + "\n")
             # drive punching a card, using current card position
             KPpunch(self)               # ask our routine to do the interaction
 
@@ -749,18 +786,23 @@ class MyFrame(wx.Frame):
             if (KPapp.myfilecurrent > KPapp.myfilelen):
                 KPapp.pause = True
                 KPapp.errstatus = "Done punching file"
+                wx.LogGeneric(wx.LOG_User,"Done punching file\n")
+                KPapp.myfilecurrentstr = "1"
+                KPapp.myfilecurrent = 1
                 KPapp.statpane.Refresh()
                 KPapp.statpane.Update()
 
         elif (KPapp.goread == True):
 
             # drive reading a card into the fline array and on screen
+            wx.LogGeneric(wx.LOG_User, "Reading a card\n")
             KPreadCard(self)                                                    # get from KP and put into last flines
-            self.fileobject.write(KPapp.flines[KPapp.myfilecurrent] + '\n')     # write it out to the file
+            self.fileobject.write(KPapp.flines[KPapp.myfilecurrent-1] + '\n')     # write it out to the file
 
         return
 
     def OnQuit(self, event):
+        wx.LogGeneric(wx.LOG_User, "User issued quit command\n")
         if ((KPapp.gopunch == True) or (KPapp.goread == True)):
             KPapp.pause = True                      # blocks from trying to punch or read another card
             try:                                    # protect against exceptions
@@ -803,6 +845,9 @@ class MyFrame(wx.Frame):
         tempjunk, tempfilename = os.path.split(str(punchfilename))
         KPapp.myframe.SetTitle("Keypunch Interface - file: " + tempfilename)
 
+        # log the opening
+        wx.LogGeneric(wx.LOG_User, "Opened file " + punchfilename + "\n")
+
         while (True):
             templine = self.fileobject.readline()
             if (templine == ""):
@@ -812,6 +857,7 @@ class MyFrame(wx.Frame):
                 break
             if (validateline(templine) == False):
                 KPapp.errstatus = "File validity check at card " + str(self.filecurrent+1)
+                wx.LogGeneric(wx.LOG_User, "File validity check at card " + str(self.filecurrent+1) + "\n")
                 KPapp.statpane.Refresh()
                 KPapp.statpane.Update()
                 self.fileobject.close()
@@ -835,6 +881,7 @@ class MyFrame(wx.Frame):
             KPapp.myfilelenstr = str(self.filecurrent)
             KPapp.myfilecurrentstr = "1"
             KPapp.statfile = " OPEN "
+            wx.LogGeneric(wx.LOG_User, "File has " + str(KPapp.myfilelen) +" cards, ready at card 1\n")
             if (KPapp.statcode == "binary"):
                 self.myview.SetRowColumnCount(KPapp.myfilelen, 399)
             else:
@@ -843,6 +890,7 @@ class MyFrame(wx.Frame):
         self.statpane.Update()
         self.myview.Refresh()
         self.myview.Update()
+        KPapp.readfile = False
         KPapp.pause = True
         KPapp.goread = False
         KPapp.gopunch = True
@@ -859,19 +907,22 @@ class MyFrame(wx.Frame):
         readfilename = wx.SaveFileSelector('cards being read as file', 'txt')
         if (os.path.exists(readfilename) == True):
             KPapp.errstatus = "The file already exists"
+            wx.LogGeneric(wx.LOG_User, "New output file " + readfilename + " already exists\n")
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
             return
         try:
             self.fileobject = open(readfilename, 'w')
         except:
-            KPapp.errstatus = "Error creating file (already exists?)"
+            KPapp.errstatus = "Error creating file"
+            wx.LogGeneric(wx.LOG_User, "Error creating output file " + readfilename + "\n")
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
             return
         # put filename in window
         tempjunk, tempfilename = os.path.split(str(readfilename))
         KPapp.myframe.SetTitle("Keypunch Interface - file: " + tempfilename)
+        wx.LogGeneric(wx.LOG_User, "Created new file " + readfilename + " for reading, currently empty\n")
 
         KPapp.myfilelen = 0
         KPapp.myfilecurrent = 0
@@ -890,6 +941,7 @@ class MyFrame(wx.Frame):
         KPapp.pause = True
         KPapp.gopunch = False
         KPapp.goread = True
+        KPapp.readfile = True
 
     def OnCloseFile(self, event):
         # keypunch must be paused to close the file
@@ -912,6 +964,7 @@ class MyFrame(wx.Frame):
 
         # strip filename from window title
         KPapp.myframe.SetTitle("Keypunch Interface - file: *none*")
+        wx.LogGeneric(wx.LOG_User, "Closed file\n")
 
         self.fileobject = None
         KPapp.myfilelen = 0

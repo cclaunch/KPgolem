@@ -177,9 +177,6 @@ void  execCommand() {
   } else if (cmdLine[0] == 'P') {
     
     // do a punch and possibly verify
-    Serial1.print(F("Punching Card of ")); // CVC
-    Serial1.print(punchLength); // CVC
-    Serial1.println(F(" columns")); // CVC
     doPunch();
     
   } else {

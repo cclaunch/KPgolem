@@ -1,7 +1,7 @@
 // 
 // assignments of pins by logical name as well as creation of important constants by name
 //
-#define VERSION "2.06beta"
+#define VERSION "2.12beta"
 #define FULLVERBS 1    // 0 to use only one letter verbs, 1 to require full verb name
 
 #define PUN12 25

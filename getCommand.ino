@@ -78,7 +78,7 @@ int getCommand() {
       cmdLine[cmdLength] = 0;                  // null delimit the string for use with printing
     }
         
-    if ((cmdMode == 2) && (cmdLength > 400)) {
+    if ((cmdMode == 2) && (cmdLength > 401)) {
       flushMode = true;
       cmdLength = 0;
       cmdLine[0] = '*';

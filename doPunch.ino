@@ -88,12 +88,6 @@ void doPunch() {
       if (lastCard[i] != readIn) {
         Serial1.print(F("WARN Verify error column "));
         Serial1.println(curCol-1);
-        Serial1.print("lastcard value for column "); // CVC
-        Serial1.print(i); // CVC
-        Serial1.print("was "); // CVC
-        Serial1.print(lastCard[i], HEX); // CVC
-        Serial1.print(" but what we read was "); // CVC
-        Serial1.println(readIn, HEX); // CVC
       }
     }
  }                                                                // end loop through columns to punch and verify
@@ -114,7 +108,6 @@ void doPunch() {
     Serial1.println(F("Last card verified during punch of this card"));
   } 
 
-// CVC  Serial1.println(F("OK Punch operation complete"));
-  Serial.println(F("OK Punch operation complete")); // CVC
+  Serial1.println(F("OK Punch operation complete"));
   return;
 }
