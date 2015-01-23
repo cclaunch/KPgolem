@@ -1,5 +1,3 @@
-import wxversion
-wxversion.select('3.0')
 import serial
 import wx
 import re
@@ -8,6 +6,7 @@ import os
 #
 # KeyPunchInterface program to drive the KPgolem interface box in an IBM keypunch (e.g. 029)
 #         see https://github.com/cclaunch/KPgolem for details and other materials
+#         version 1.02beta
 #
 
 def kpinit(mylink, myport):
@@ -435,8 +434,15 @@ def KPreadCard(self):
             KPapp.myfilelen += 1                                    # update the card count (file length)
             KPapp.myfilelenstr = str(KPapp.myfilelen)               # update the text card count
             KPapp.errstatus = " "
+            if (KPapp.isbinary == 1):
+                thewidth = 400
+            else:
+                thewidth = 80
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
+            KPapp.viewpane.SetRowColumnCount(KPapp.myfilelen,thewidth)
+            KPapp.viewpane.Refresh()
+            KPapp.viewpane.Update()
             break
         temppos = KPapp.KPmessage.find("Register card")             # interim issue - let user know cards are not ready
         if (temppos != -1):
@@ -864,7 +870,11 @@ class MyFrame(wx.Frame):
                 self.fileobject = None
                 KPapp.flines = []
                 break
-            KPapp.flines.append(templine)
+            # some files have CR before the NL, but we want to remove it
+            if (templines.rfind('\r') != -1):
+                KPapp.flines.append(templine[:-1])
+            else:
+                KPapp.flines.append(templine)
             self.filecurrent += 1
 
         if (self.fileobject == None):
@@ -912,7 +922,7 @@ class MyFrame(wx.Frame):
             KPapp.statpane.Update()
             return
         try:
-            self.fileobject = open(readfilename, 'w')
+            self.fileobject = open(readfilename, 'wb')      # must open binary to stop windows from adding CR in front of NL
         except:
             KPapp.errstatus = "Error creating file"
             wx.LogGeneric(wx.LOG_User, "Error creating output file " + readfilename + "\n")
