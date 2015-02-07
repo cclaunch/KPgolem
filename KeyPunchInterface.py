@@ -2,6 +2,8 @@ import serial
 import wx
 import re
 import os
+import codecs
+import struct
 
 #
 # KeyPunchInterface program to drive the KPgolem interface box in an IBM keypunch (e.g. 029)
@@ -161,7 +163,7 @@ def dropport(self):
 
 # routine to set encoding to BCD as ASCII characters
 def setbcd(self):
-    KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\n"
+    KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     KPapp.isbinary = 0
     KPapp.myconfig.Write('Encoding/Code', 'BCD')
     KPapp.myconfig.Flush()
@@ -187,7 +189,7 @@ def setbcd(self):
 
 # routine to set encoding to EBCDIC as ASCII characters
 def setebcdic(self):
-    KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n"
+    KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
     KPapp.isbinary = 0
     KPapp.myconfig.Write('Encoding/Code', 'EBCDIC')
     KPapp.myconfig.Flush()
@@ -231,30 +233,206 @@ def setbinary(self):
     wx.LogGeneric(wx.LOG_User, "Set keypunch to binary mode\n")
     return
 
-# routine to set encoding to 1130 simulator card files
-def set1130card(self):
-    KPapp.goodchars = ""
+# routine to set encoding to 1130 simulator card files with 029 keypunch format
+def set1130card029(self):
+    KPapp.goodchars = " !" + '"' + "#$%&'()*+,-./0123456789:;<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ_[^abcdefghijklmnopqrstuvwxyz|"
     KPapp.isbinary = 0
-    KPapp.myconfig.Write('Encoding/Code', '1130CARD')
+    KPapp.myconfig.Write('Encoding/Code', '1130card029')
     KPapp.myconfig.Flush()
-    KPapp.statcode = '1130 Card'
+    KPapp.statcode = '1130card029'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
-    wx.LogGeneric(wx.LOG_User, "Set keypunch to 1130 card image mode\n")
+    KPapp.fwtrans = { U'\xac' : '^', U'\xa2': '['}  # mapping 1130card029 to EBCDIC on punching cards from files
+    KPapp.bktrans = { '[' : U'\xa2', '^': U'\xac'}  # mapping EBCDIC to 1130card029 on reading cards to file
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "_MODE ASCII")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is ASCII')
+        if (temppos != -1):
+            break
+    KPsend(self, "_CODE EBCDIC")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is EBCDIC')
+        if (temppos != -1):
+            break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to EBCDIC mode for 1130 Simulator 029 card format\n")
+    return
+
+# routine to set encoding to 1130 simulator card files with 026 Fortran keyboard keypunch format
+def set1130card026F(self):
+    KPapp.goodchars = " .<%$*,#@0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    KPapp.isbinary = 0
+    KPapp.myconfig.Write('Encoding/Code', '1130card026F')
+    KPapp.myconfig.Flush()
+    KPapp.statcode = '1130card026F'
+    KPapp.statpane.Refresh()
+    KPapp.statpane.Update()
+    KPapp.fwtrans = { U'\xa2': '[', U'\xac' : '^'}  # mapping will never be used, not valid character in this encoding
+    KPapp.bktrans = { '[' : U'\xa2', '^': U'\xac'}  # left here for commonality of code doing the encoding/decoding
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "_MODE ASCII")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is ASCII')
+        if (temppos != -1):
+            break
+    KPsend(self, "_CODE EBCDIC")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is EBCDIC')
+        if (temppos != -1):
+            break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to EBCDIC mode for 1130 Simulator 026 Fortran card format\n")
+    return
+
+# routine to set encoding to 1130 simulator card files with 026 Commercial keyboard keypunch format
+def set1130card026C(self):
+    KPapp.goodchars = " .<%$*,#@0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    KPapp.isbinary = 0
+    KPapp.myconfig.Write('Encoding/Code', '1130card026C')
+    KPapp.myconfig.Flush()
+    KPapp.statcode = '1130card026C'
+    KPapp.statpane.Refresh()
+    KPapp.statpane.Update()
+    KPapp.fwtrans = { U'\xa2': '[', U'\xac' : '^'}  # mapping will never be used, not valid character in this encoding
+    KPapp.bktrans = { '[' : U'\xa2', '^': U'\xac'}  # left here for commonality of code doing the encoding/decoding
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "_MODE ASCII")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is ASCII')
+        if (temppos != -1):
+            break
+    KPsend(self, "_CODE EBCDIC")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is EBCDIC')
+        if (temppos != -1):
+            break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to EBCDIC mode for 1130 Simulator 026 Commercial card format\n")
     return
 
 # routine to set encoding to 1130 simulator binary files
 def set1130binary(self):
-    KPapp.goodchars = ""
-    KPapp.isbinary = 0
-    KPapp.myconfig.Write('Encoding/Code', '1130BINARY')
+    KPapp.goodchars = " 0123456789abcdefABCDEF\n"
+    KPapp.isbinary = 1
+    KPapp.myconfig.Write('Encoding/Code', '1130binary')
     KPapp.myconfig.Flush()
-    KPapp.statcode = '1130 binary'
+    KPapp.statcode = '1130binary'
     KPapp.statpane.Refresh()
     KPapp.statpane.Update()
-    wx.LogGeneric(wx.LOG_User, "Set keypunch to 1130 binary image mode\n")
+    if (KPapp.goodlink == False):                   # link not established
+        return
+    KPsend(self, "_MODE BINARY")
+    while (True):
+        getKPresponse(self)
+        temppos = KPapp.KPmessage.find('is BINARY')
+        if (temppos != -1):
+            break
+    wx.LogGeneric(wx.LOG_User, "Set keypunch to binary mode for 1130 Simulator binary card format\n")
     return
 
+# routine to return ascii hexadecimal digits from binary byte
+def gethex(mybyte):
+    secondhalf = mybyte & 0x0F                      # x'0F' mask
+    firsthalf = (mybyte >> 4) & 0x0F                # move first nibble to replace second nibble
+    if (firsthalf < 10):
+        answer = str(chr(firsthalf + 48))           # make it ascii '0' to '9'
+    else:
+        answer = str(chr((firsthalf - 10) + 65))    # make it ascii 'A' to 'F'
+    if (secondhalf < 10):
+        answer += str(chr(secondhalf + 48))         # make it ascii '0' to '9'
+    else:
+        answer += str(chr((secondhalf - 10) + 65))  # make it ascii 'A' to 'F'
+    return answer
+
+#routine to return int value of a pair of ascii character which are hexadecimal digits
+def getint(mychar):
+    firsthalf = mychar[0]
+    secondhalf = mychar[1]
+    if (firsthalf in '0123456789ABCDEF'):
+        firsthalf = ord(firsthalf)
+        if (firsthalf < 65):
+            firsthalf -= 48
+        else:
+            firsthalf -= 65
+            firsthalf += 10
+        answer = firsthalf * 16
+    else:
+        answer = 0
+    if (secondhalf in '0123456789ABCDEF'):
+        secondhalf = ord(secondhalf)
+        if (secondhalf < 65):
+            secondhalf -= 48
+        else:
+            secondhalf -= 65
+            secondhalf += 10
+        answer += secondhalf
+    else:
+        answer = 0
+    return answer
+
+# routine to rewrite an 1130 Simulator binary file to our standard binary format
+def rewritebinary(theline):
+    newline = ""
+    if (len(theline) == 0):
+        return newline
+    for i in range(0, 160, 2):                      # step through each halfword
+        mytuple = struct.unpack('H',theline[i:i+2])  # pick up the binary value
+        mybinary = mytuple[0] >> 4
+        hibyte = mybinary /256
+        lobyte = mybinary % 256
+        # result takes original hibyte = AB and lobyte = C0, forming hibyte = 0A and lobyte = BC
+        newline += gethex(hibyte)
+        newline += gethex(lobyte)
+        newline += " "
+    return newline[:-1]                             # no trailing space
+
+# routine to rewrite our standard binary format to the 1130 Simulator binary format
+def writebinary(theline):
+    newline = ""
+    if (len(theline) == 0):
+        return newline
+    for i in range(0,len(theline),5):                   # run through the ascii encoded binary columns
+        mystring = theline[i:i+4]                   # get four hex characters
+        if (mystring[0] != '0'):                    # is it space or space equivalent?
+            newline += struct.pack('H',0)           # make it a binary zero
+        else:                                       # we have to turn this into binary value
+            myint = getint(theline[i+1:i+3])        # get middle two digits and turn into binary value
+            myint *= 256                            # shift this up to top of halfword
+            myint += getint(theline[i+3] + '0')     # now extract the last four rows and pad with zeros
+            newline += struct.pack('H',myint)        # add in the halfword
+    # if record was short, pad out with spaces    
+    for i in range (0,(160 - len(newline)),2):
+        newline += struct.pack('H',0)
+    return newline                                  # this will be our 160 byte fixed record
+
+# this routine will take the Unicode data read in from codecs.read and turn it into my standard ascii encoded EBCDIC
+def uni2ebcdic(decodedline):
+    newline = ""
+    for c in decodedline:
+        if (c in KPapp.fwtrans):
+            newline += str(KPapp.fwtrans[c])
+        else:
+            newline += str(c)
+    return newline
+
+# this routine will take my standard ascii encoded EBCDIC and cover it to Unicode data before writing to disk
+def ebcdic2uni(encodedline):
+    newline = ""
+    for c in encodedline:
+        if (c in KPapp.bktrans):
+            newline += KPapp.bktrans[c]
+        else:
+            newline += c
+    return newline
+
+# this routine validates that lines are consistent with the users' selected encoding
 def validateline(theline):
 
     # if not binary, can't be more than 80 characters plus NL
@@ -269,7 +447,7 @@ def validateline(theline):
     # if binary mode, must verify the pattern is legitimate
     if (KPapp.isbinary == 0):          # not binary
         return True
-    
+ 
     # check for format of 0 to 80 groups of four hex digits with spaces in between, optional NL
     if (re.search("^(([0123456789abcdefABCDEF]{4}) ?){0,80}\\n?$",theline) == None):    # get None if no match
         return False
@@ -430,7 +608,8 @@ def KPreadCard(self):
         if (temppos != -1):
             KPapp.myfilecurrent += 1                                # update the card pointer
             KPapp.myfilecurrentstr = str(KPapp.myfilecurrent)       # update the text card pointer
-            KPapp.flines.append(KPapp.KPmessage[temppos+13:])       # add the remainder of the line (the card image) to the file
+            templine = KPapp.KPmessage[temppos+13:]                 # pick up the remainder of the line as read by KPgolem
+            KPapp.flines.append(templine)                           # add the line (the card image) to the file
             KPapp.myfilelen += 1                                    # update the card count (file length)
             KPapp.myfilelenstr = str(KPapp.myfilelen)               # update the text card count
             KPapp.errstatus = " "
@@ -566,10 +745,20 @@ class myviewclass (wx.HVScrolledWindow ):
 
             # now run through the columns of this card
             for j in range (startcol, endcol):
-                mydc.DrawText(' ', (j-startcol)*14+3, (i-startrow)*18+1)                    # blank it first
+                mydc.DrawText(' ', (j-startcol)*14+3, (i-startrow)*18+1)                        # blank it first
                 if (j < len(KPapp.flines[i])):
-                    mydc.DrawText(KPapp.flines[i][j],(j-startcol)*14+3, (i-startrow)*18+1)  # real character if not past end of line
+                    if (KPapp.statcode == '1130card029'):
+                        if (KPapp.flines[i][j] == '^'):
+                            mydc.DrawText(U'\xac',(j-startcol)*14+3, (i-startrow)*18+1)         # draw logical not
+                        elif (KPapp.flines[i][j] == '['):
+                            mydc.DrawText(U'\xa2',(j-startcol)*14+3, (i-startrow)*18+1)         # draw cent sign
+                        else:
+                            mydc.DrawText(KPapp.flines[i][j],(j-startcol)*14+3, (i-startrow)*18+1)  # real character if not past end of line
+                    else:
+                        mydc.DrawText(KPapp.flines[i][j],(j-startcol)*14+3, (i-startrow)*18+1)      # real character if not past end of line
 
+        KPapp.statpane.Refresh()
+        KPapp.statpane.Update()
         return
 
 class mytimer(wx.Timer):
@@ -596,6 +785,36 @@ class MyStatClass(wx.Panel):
         self.GetGrandParent().myfilecurrentstrF.SetLabel(KPapp.myfilecurrentstr)
         self.GetGrandParent().errstatusF.SetLabel(KPapp.errstatus)
         self.GetGrandParent().statcodeF.SetLabel(KPapp.statcode)
+
+        # now draw the ruler across the top of the Status area
+        myfont = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        mydc.SetFont(myfont)
+        startpt = KPapp.viewpane.GetVisibleBegin()
+        endpt = KPapp.viewpane.GetVisibleEnd()
+        jump = 14                                               # size of one column in pixels
+        pixel = 6
+        if ((KPapp.statcode == 'binary') or (KPapp.statcode == '1130binary')):
+            modulo = 25                                         # spot for numeric label and tall line (each five logical card columns)
+            bump = 5                                            # spot for normal line (to cover each logical card column)
+            for i in range (startpt.GetCol(), endpt.GetCol()):
+                thiscol = (i/bump) + 1
+                if ((i % modulo) == (modulo - 3)):              # is this a mulitple of 5 logical card columns?
+                    mydc.DrawLine(pixel, 2, pixel, 12)          # tall line
+                    mydc.DrawText(str(thiscol), pixel-6, 12)    # and stick in a label each five columns
+                elif ((i % bump) == (bump - 3)):                # is it the right point in a single column?
+                    mydc.DrawLine(pixel, 5, pixel, 8)           # normal line
+                pixel += jump                                   # move over one logical column
+        else:
+            modulo = 5                                          # spot for numeric label (each five logical card columns)
+            pixel = 6                                           # starting pixel point in each column
+            for i in range (startpt.GetCol(), endpt.GetCol()):  # go through the visible columns out of the 80
+                thiscol = i + 1                                 # convert to origin 1 system for human interface
+                if ((i % modulo) == (modulo - 1)):              # is this a mulitple of 5 logical card columns?
+                    mydc.DrawLine(pixel, 2, pixel, 12)          # draw a tall line to indicate this
+                    mydc.DrawText(str(thiscol), pixel-6, 12)    # and stick in a label each five columns
+                else:                                           # otherwise draw a small tick
+                    mydc.DrawLine(pixel, 5, pixel, 8)           # shorter line for columns not divisible by 5
+                pixel += jump                                   # move over one logical column's worth of pixels
         return
 
 class MyFrame(wx.Frame):
@@ -606,7 +825,7 @@ class MyFrame(wx.Frame):
         toppane = wx.Panel(self,-1)
 
         # create a scrolling pane inside top pane taking all the room except for the status pane
-        self.myview = myviewclass(toppane, -1, size=(self.GetClientSize().GetWidth(),self.GetClientSize().GetHeight()-50), style=wx.FULL_REPAINT_ON_RESIZE)
+        self.myview = myviewclass(toppane, -1, size=(self.GetClientSize().GetWidth(),self.GetClientSize().GetHeight()-65), style=wx.FULL_REPAINT_ON_RESIZE)
 
         # create our status pane inside top pane
         self.statpane = MyStatClass(toppane, -1, size=(-1,50))
@@ -615,8 +834,8 @@ class MyFrame(wx.Frame):
         mybox = wx.BoxSizer(wx.VERTICAL)
         mybox.Add(self.myview, proportion = 1, flag = wx.ALIGN_TOP | wx.ALIGN_LEFT | wx.EXPAND)
         mybox.Add(self.statpane, proportion = 0, flag = wx.ALIGN_BOTTOM | wx.ALIGN_LEFT | wx.FIXED_MINSIZE)
-        self.statpane.SetMinSize((-1,50))
-        self.statpane.SetMaxSize((-1,50))
+        self.statpane.SetMinSize((-1,65))
+        self.statpane.SetMaxSize((-1,65))
 
         # set this sizer into the top pane
         toppane.SetSizer(mybox)
@@ -629,7 +848,7 @@ class MyFrame(wx.Frame):
         self.statpane.Bind(wx.EVT_PAINT, self.statpane.StatPaint)
         KPapp.statpane = self.statpane
 
-        # create the two lines of our pseudo status bar
+        # create the three lines of our pseudo status bar
         stvbox = wx.BoxSizer(wx.VERTICAL)               # divide pane into two lines
         sthbox1 = wx.BoxSizer(wx.HORIZONTAL)            # divide top line of status bar into horizontal fields
         sthbox2 = wx.BoxSizer(wx.HORIZONTAL)            # divide the bottom line of status bar into horizontal fields
@@ -672,7 +891,11 @@ class MyFrame(wx.Frame):
         # attach a resize handler to redraw the variable padding between the sides of the status pane
         toppane.Bind(wx.EVT_SIZE, self.onSize)
 
+        # set up the column ruler panel
+        myruler = wx.Panel(self.statpane, -1, size=(-1,25))
+
         # Install the pseudo status bar now
+        stvbox.Add(myruler)
         stvbox.Add(sthbox1)
         stvbox.Add(sthbox2)
 
@@ -699,8 +922,10 @@ class MyFrame(wx.Frame):
         menbcd = myoptionsmenu.Append(30, 'BCD\tCtrl + 1', 'BCD encoded ASCII', kind=wx.ITEM_RADIO)
         menebcdic = myoptionsmenu.Append(31, 'EBCDIC\tCtrl + 2', 'EBCDIC encoded ASCII', kind=wx.ITEM_RADIO)
         menbinary = myoptionsmenu.Append(32, 'binary\tCtrl + 3', 'binary encoded in ASCII', kind=wx.ITEM_RADIO)
-        men1130card = myoptionsmenu.Append(33, '1130card\tCtrl + 4', '1130 hollerith encoded in ASCII', kind=wx.ITEM_RADIO)
-        men1130binary = myoptionsmenu.Append(34, '1130binary\tCtrl + 5', '1130 binary cards encoded ASCII', kind=wx.ITEM_RADIO)
+        men1130card029 = myoptionsmenu.Append(33, '1130 Card 029\tCtrl + 4', '1130 029 hollerith encoded in ASCII', kind=wx.ITEM_RADIO)
+        men1130binary = myoptionsmenu.Append(34, '1130 binary\tCtrl + 5', '1130 binary cards encoded ASCII', kind=wx.ITEM_RADIO)
+        men1130card026F = myoptionsmenu.Append(35, '1130 Card 026 Fortran\tCtrl + 6', '1130 026 Fortran hollerith encoded in ASCII', kind=wx.ITEM_RADIO)
+        men1130card026C = myoptionsmenu.Append(36, '1130 Card 026 Commercial\tCtrl + 7', '1130 026 Commercial hollerith encoded in ASCII', kind=wx.ITEM_RADIO)
         myline4 = myoptionsmenu.AppendSeparator()
         myreset = myoptionsmenu.Append(50, 'F&orget serial port\tCtrl + F', 'Forget the saved serial port')
         mylog = myoptionsmenu.Append(45, 'Show Keypunch L&og\tCtrl + L', 'Displays a log of KP interface outputs')
@@ -710,6 +935,7 @@ class MyFrame(wx.Frame):
         mybar.Append(myactionmenu, "Actions")
         mybar.Append(myoptionsmenu, "Options")
         self.SetMenuBar(mybar)
+
 
         # set up accelerators for menus
         self.myacceltab = wx.AcceleratorTable(     [(wx.ACCEL_CTRL, ord('N'), 2),
@@ -726,6 +952,8 @@ class MyFrame(wx.Frame):
                                                     (wx.ACCEL_CTRL, ord('3'), 32),
                                                     (wx.ACCEL_CTRL, ord('4'), 33),
                                                     (wx.ACCEL_CTRL, ord('5'), 34),
+                                                    (wx.ACCEL_CTRL, ord('6'), 35),
+                                                    (wx.ACCEL_CTRL, ord('7'), 36),
                                                     (wx.ACCEL_CTRL, ord('L'), 45),
                                                     (wx.ACCEL_CTRL, ord('F'), 50),
                                                     ])
@@ -747,7 +975,9 @@ class MyFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, setbcd, menbcd)
         self.Bind(wx.EVT_MENU, setebcdic, menebcdic)
         self.Bind(wx.EVT_MENU, setbinary, menbinary)
-        self.Bind(wx.EVT_MENU, set1130card, men1130card)
+        self.Bind(wx.EVT_MENU, set1130card029, men1130card029)
+        self.Bind(wx.EVT_MENU, set1130card026F, men1130card026F)
+        self.Bind(wx.EVT_MENU, set1130card026C, men1130card026C)
         self.Bind(wx.EVT_MENU, set1130binary, men1130binary)
         self.Bind(wx.EVT_MENU, self.showabout, myabout)
         self.Bind(wx.EVT_MENU, dropport, myreset)
@@ -762,6 +992,7 @@ class MyFrame(wx.Frame):
         self.punchfilename = ""
         self.readfilename = ""
         self.fileobject = None
+        self.fileobjectcodec = None
         self.filelen = 0
         self.filecurrent = 0
         KPapp.errstatus = ""
@@ -802,8 +1033,20 @@ class MyFrame(wx.Frame):
 
             # drive reading a card into the fline array and on screen
             wx.LogGeneric(wx.LOG_User, "Reading a card\n")
-            KPreadCard(self)                                                    # get from KP and put into last flines
-            self.fileobject.write(KPapp.flines[KPapp.myfilecurrent-1] + '\n')     # write it out to the file
+            KPreadCard(self)                                        # get from KP and put into last flines
+            templine = KPapp.flines[KPapp.myfilecurrent - 1] + '\n'
+
+            # translate if 1130 card format
+            if (KPapp.statcode[:8] == '1130card'):                  # is it 029, 026 Fortran or 026 Commercial encoding?
+                templine = ebcdic2uni(theline);                     # go deal with special characters
+            elif (KPapp.statcode == '1130binary'):                  # must write it as the binary format used by Brian Knittel
+                templine = writebinary(templine)                    # go translate this to 160 character fixed record
+
+            # write it out to disk
+            if (KPapp.statcode[:8] == '1130card'):
+                self.fileobjectcodec.write(templine)
+            else:
+                self.fileobject.write(templine)                         # write it out to the file
 
         return
 
@@ -828,7 +1071,7 @@ class MyFrame(wx.Frame):
 
     def OnPunch(self, event):
         # make sure no other file is open now
-        if (self.fileobject != None):
+        if ((self.fileobject != None) or (self.fileobjectcodec != None)):
             KPapp.errstatus = "A file is currently open"
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
@@ -836,14 +1079,28 @@ class MyFrame(wx.Frame):
 
         # go ask user to pick the file they want opened
         punchfilename = wx.LoadFileSelector('file with card images to punch', 'txt')
-        #open the file, check it over and get the count of cards
-        try:
-            self.fileobject = open(punchfilename)
-        except:
-            KPapp.errstatus = "Error opening file"
-            KPapp.statpane.Refresh()
-            KPapp.statpane.Update()
-            return
+
+        # open as Unicode using codec if an IBM 1130 Simulator card format, else use normal ASCII files
+        if (KPapp.statcode[:8] == "1130card"):
+            #open the file, check it over and get the count of cards
+            try:
+                self.fileobjectcodec = codecs.open(punchfilename, encoding='mbcs', mode='rb')
+            except:
+                KPapp.errstatus = "Error opening file for IBM 1130 Simulator card format file"
+                wx.LogGeneric(wx.LOG_User, "Open error for 1130 card format file " + punchfilename + "\n")
+                KPapp.statpane.Refresh()
+                KPapp.statpane.Update()
+                return
+        else:
+            #open the file, check it over and get the count of cards
+            try:
+                self.fileobject = open(punchfilename, mode = 'rb')
+            except:
+                KPapp.errstatus = "Error opening file"
+                wx.LogGeneric(wx.LOG_User, "Open error for standard or 1130 binary format file " + punchfilename + "\n")
+                KPapp.statpane.Refresh()
+                KPapp.statpane.Update()
+                return
         self.filecurrent = 0
         KPapp.flines = []
 
@@ -854,30 +1111,43 @@ class MyFrame(wx.Frame):
         # log the opening
         wx.LogGeneric(wx.LOG_User, "Opened file " + punchfilename + "\n")
 
+        # loop through reading in one of the three methods depending on user's selected encoding
         while (True):
-            templine = self.fileobject.readline()
+            if (KPapp.statcode[:8] == '1130card'):
+                templine = uni2ebcdic(self.fileobjectcodec.readline())  # get decoded Unicode line, rewritten to ascii-encoded-EBCDIC
+            elif (KPapp.statcode == '1130binary'):
+                templine = rewritebinary(self.fileobject.read(160))     # get fixed sized binary records, then rewrite to ascii-encoded-binary
+            else:
+                templine = self.fileobject.readline()                   # get ascii line which will be already be ascii-encoded-BCD or ascii-encoded-EBCDIC
             if (templine == ""):
                 KPapp.errstatus = ""
                 KPapp.statpane.Refresh()
                 KPapp.statpane.Update()
                 break
+            # some files have CR inserted before the NL, many have ending NL but we want to remove it
+            #  we can't do this for 1130 binary files as this could be a legitimate bit pattern in one
+            if ((KPapp.statcode != '1130binary') and (templine[len(templine) - 2] == '\r')):
+                templine = templine[:-2]
+            elif ((KPapp.statcode != '1130binary') and (templine[len(templine) - 1] == '\n')):
+                templine = templine[:-1]
+            # validate this is one of the legit characters in the encoding set
             if (validateline(templine) == False):
                 KPapp.errstatus = "File validity check at card " + str(self.filecurrent+1)
                 wx.LogGeneric(wx.LOG_User, "File validity check at card " + str(self.filecurrent+1) + "\n")
                 KPapp.statpane.Refresh()
                 KPapp.statpane.Update()
-                self.fileobject.close()
+                if (KPapp.statcode[:8] == '1130card'):
+                    self.fileobjectcodec.close()
+                else:
+                    self.fileobject.close()
                 self.fileobject = None
                 KPapp.flines = []
                 break
-            # some files have CR before the NL, but we want to remove it
-            if (templines.rfind('\r') != -1):
-                KPapp.flines.append(templine[:-1])
-            else:
-                KPapp.flines.append(templine)
+            # store this line away
+            KPapp.flines.append(templine)
             self.filecurrent += 1
 
-        if (self.fileobject == None):
+        if  ((self.fileobject == None) and (self.fileobjectcodec == None)):
             KPapp.myfilelen = 0
             KPapp.myfilecurrent = 0
             KPapp.myfilelenstr = "0"
@@ -893,6 +1163,8 @@ class MyFrame(wx.Frame):
             KPapp.statfile = " OPEN "
             wx.LogGeneric(wx.LOG_User, "File has " + str(KPapp.myfilelen) +" cards, ready at card 1\n")
             if (KPapp.statcode == "binary"):
+                self.myview.SetRowColumnCount(KPapp.myfilelen, 399)
+            elif (KPapp.statcode == "1130binary"):
                 self.myview.SetRowColumnCount(KPapp.myfilelen, 399)
             else:
                 self.myview.SetRowColumnCount(KPapp.myfilelen,80)
@@ -921,14 +1193,26 @@ class MyFrame(wx.Frame):
             KPapp.statpane.Refresh()
             KPapp.statpane.Update()
             return
-        try:
-            self.fileobject = open(readfilename, 'wb')      # must open binary to stop windows from adding CR in front of NL
-        except:
-            KPapp.errstatus = "Error creating file"
-            wx.LogGeneric(wx.LOG_User, "Error creating output file " + readfilename + "\n")
-            KPapp.statpane.Refresh()
-            KPapp.statpane.Update()
-            return
+        # open as Unicode using codec if an IBM 1130 Simulator card format, else use normal ASCII files
+        if (KPapp.statcode[:8] == "1130card"):
+            #open the file, check it over and get the count of cards
+            try:
+                self.fileobjectcodec = codecs.open(readfilename, encoding='mbcs', mode='wb')
+            except:
+                KPapp.errstatus = "Error opening file for IBM 1130 Simulator card format file"
+                wx.LogGeneric(wx.LOG_User, "Open error on output in 1130 card format file " + readfilename + "\n")
+                KPapp.statpane.Refresh()
+                KPapp.statpane.Update()
+                return
+        else:
+            try:
+                self.fileobject = open(readfilename, 'wb')      # must open binary to stop windows from adding CR in front of NL
+            except:
+                KPapp.errstatus = "Error creating file"
+                wx.LogGeneric(wx.LOG_User, "Error creating output file " + readfilename + "\n")
+                KPapp.statpane.Refresh()
+                KPapp.statpane.Update()
+                return
         # put filename in window
         tempjunk, tempfilename = os.path.split(str(readfilename))
         KPapp.myframe.SetTitle("Keypunch Interface - file: " + tempfilename)
@@ -942,7 +1226,7 @@ class MyFrame(wx.Frame):
         KPapp.statfile = " OPEN "
 
         #lets put the empty file into the UI window
-        if (KPapp.statcode == "binary"):
+        if ((KPapp.statcode == "binary") or (KPapp.statcode == '1130binary')):
             self.myview.SetRowColumnCount(0, 399)
         else:
             self.myview.SetRowColumnCount(0,80)
@@ -954,6 +1238,7 @@ class MyFrame(wx.Frame):
         KPapp.readfile = True
 
     def OnCloseFile(self, event):
+
         # keypunch must be paused to close the file
         if (KPapp.pause == False):
             KPapp.errstatus = "Keypunch must be paused to close files"
@@ -965,18 +1250,28 @@ class MyFrame(wx.Frame):
         KPapp.gopunch = False
         KPapp.goread = False
 
-        # try to close the file now
-        try:
-            self.fileobject.close()
-            KPapp.errstatus = ""
-        except:
-            KPapp.errstatus = "File was not open"
+        # try to close the file now, either codec or ascii
+        if (KPapp.statcode[:8] == '1130card'):
+            try:
+                self.fileobjectcodec.close()
+                KPapp.errstatus = ""
+            except:
+                KPapp.errstatus = "File for 1130 simulator format was not open"
+                wx.LogGeneric(wx.LOG_User, "Error closing 1130simulator input file\n")
+        else:
+            try:
+                self.fileobject.close()
+                KPapp.errstatus = ""
+            except:
+                KPapp.errstatus = "File for standard format was not open"
+                wx.LogGeneric(wx.LOG_User, "Error closing standard format input file\n")
 
         # strip filename from window title
         KPapp.myframe.SetTitle("Keypunch Interface - file: *none*")
         wx.LogGeneric(wx.LOG_User, "Closed file\n")
 
         self.fileobject = None
+        self.fileobjectcodec = None
         KPapp.myfilelen = 0
         KPapp.myfilecurrent = 0
         self.filecurrent = 0
@@ -1075,12 +1370,18 @@ class MyFrame(wx.Frame):
         elif (code == 'BINARY'):
             KPapp.menoptions.Check(32,True)
             setbinary(self)
-        elif (code == '1130CARD'):
+        elif (code == '1130card029'):
             KPapp.menoptions.Check(33,True)
-            set1130card(self)
-        elif (code == '1130BINARY'):
+            set1130card029(self)
+        elif (code == '1130binary'):
             KPapp.menoptions.Check(34,True)
             set1130binary(self)
+        elif (code == '1130card026F'):
+            KPapp.menoptions.Check(35,True)
+            set1130card026F(self)
+        elif (code == '1130card026C'):
+            KPapp.menoptions.Check(36,True)
+            set1130card026C(self)
         else:
             KPapp.menoptions.Check(30,True)
             setbcd(self)
